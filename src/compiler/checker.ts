@@ -4103,11 +4103,11 @@ module ts {
             }
             return createArrayType(elementType);
         }
-
+        
         function isNumericName(name: string) {
             return (name !== "") && !isNaN(<number><any>name);
         }
-
+        
         function checkObjectLiteral(node: ObjectLiteral, contextualMapper?: TypeMapper): Type {
             var members = node.symbol.members;
             var properties: SymbolTable = {};

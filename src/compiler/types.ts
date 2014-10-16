@@ -20,6 +20,10 @@ module ts {
         NumericLiteral,
         StringLiteral,
         RegularExpressionLiteral,
+        NoSubstitutionTemplateLiteral,
+        TemplateHeadLiteral,
+        TemplateMiddleLiteral,
+        TemplateTailLiteral,
         // Punctuation
         OpenBraceToken,
         CloseBraceToken,
@@ -1189,6 +1193,7 @@ module ts {
         asterisk = 0x2A,              // *
         at = 0x40,                    // @
         backslash = 0x5C,             // \
+        backtick = 0x60,              // `
         bar = 0x7C,                   // |
         caret = 0x5E,                 // ^
         closeBrace = 0x7D,            // }
