@@ -60,7 +60,7 @@ module ts {
 
         function getDeclarationName(node: Declaration): string {
             if (node.name) {
-                if (node.kind === SyntaxKind.ModuleDeclaration && node.name.kind === SyntaxKind.StringLiteral) {
+                if (node.kind === SyntaxKind.ModuleDeclaration && isTextualLiteralKind(node.name.kind)) {
                     return '"' + node.name.text + '"';
                 }
                 return node.name.text;
@@ -244,7 +244,7 @@ module ts {
         }
 
         function bindModuleDeclaration(node: ModuleDeclaration) {
-            if (node.name.kind === SyntaxKind.StringLiteral) {
+            if (isTextualLiteralKind(node.name.kind)) {
                 bindDeclaration(node, SymbolFlags.ValueModule, SymbolFlags.ValueModuleExcludes, /*isBlockScopeContainer*/ true);
             }
             else if (isInstantiated(node)) {

@@ -906,7 +906,7 @@ module ts {
         }
 
         function hasExternalModuleSymbol(declaration: Declaration) {
-            return (declaration.kind === SyntaxKind.ModuleDeclaration && declaration.name.kind === SyntaxKind.StringLiteral) ||
+            return (declaration.kind === SyntaxKind.ModuleDeclaration && isTextualLiteralKind(declaration.name.kind)) ||
                 (declaration.kind === SyntaxKind.SourceFile && isExternalModule(<SourceFile>declaration));
         }
 
@@ -1389,7 +1389,7 @@ module ts {
             function getContainingExternalModule(node: Node) {
                 for (; node; node = node.parent) {
                     if (node.kind === SyntaxKind.ModuleDeclaration) {
-                        if ((<ModuleDeclaration>node).name.kind === SyntaxKind.StringLiteral) {
+                        if (isTextualLiteralKind((<ModuleDeclaration>node).name.kind)) {
                             return node;
                         }
                     }
@@ -2178,7 +2178,7 @@ module ts {
                 for (var i = 0, n = declaration.parameters.length; i < n; i++) {
                     var param = declaration.parameters[i];
                     parameters.push(param.symbol);
-                    if (param.type && param.type.kind === SyntaxKind.StringLiteral) {
+                    if (param.type && isTextualLiteralKind(param.type.kind)) {
                         hasStringLiterals = true;
                     }
                     if (minArgumentCount < 0) {
@@ -2600,6 +2600,7 @@ module ts {
                 case SyntaxKind.VoidKeyword:
                     return voidType;
                 case SyntaxKind.StringLiteral:
+                case SyntaxKind.NoSubstitutionTemplateLiteral:
                     return getTypeFromStringLiteral(<StringLiteralTypeNode>node);
                 case SyntaxKind.TypeReference:
                     return getTypeFromTypeReferenceNode(<TypeReferenceNode>node);
@@ -4292,7 +4293,7 @@ module ts {
                 // handle cases when objectType is type parameter with invalid type
                 return unknownType;
             }
-            if (node.index.kind === SyntaxKind.StringLiteral || node.index.kind === SyntaxKind.NumericLiteral) {
+            if (isLiteralKind(node.index.kind)) {
                 var name = (<LiteralExpression>node.index).text;
                 var prop = getPropertyOfApparentType(apparentType, name);
                 if (prop) {
@@ -4448,7 +4449,7 @@ module ts {
 
                     var paramType = getTypeAtPosition(signature, i);
                     // String literals get string literal types unless we're reporting errors
-                    var argType = arg.kind === SyntaxKind.StringLiteral && !reportErrors ?
+                    var argType = isTextualLiteralKind(arg.kind) && !reportErrors ?
                         getStringLiteralType(<LiteralExpression>arg) :
                         checkExpressionWithContextualType(arg, paramType, excludeArgument && excludeArgument[i] ? identityMapper : undefined);
                     // Use argument expression as error location when reporting errors
@@ -5281,6 +5282,7 @@ module ts {
                 case SyntaxKind.NumericLiteral:
                     return numberType;
                 case SyntaxKind.StringLiteral:
+                case SyntaxKind.NoSubstitutionTemplateLiteral:
                     return stringType;
                 case SyntaxKind.RegularExpressionLiteral:
                     return globalRegExpType;
@@ -5925,7 +5927,7 @@ module ts {
                     case SyntaxKind.InterfaceDeclaration:
                         return SymbolFlags.ExportType;
                     case SyntaxKind.ModuleDeclaration:
-                        return (<ModuleDeclaration>d).name.kind === SyntaxKind.StringLiteral || isInstantiated(d)
+                        return isTextualLiteralKind((<ModuleDeclaration>d).name.kind) || isInstantiated(d)
                             ? SymbolFlags.ExportNamespace | SymbolFlags.ExportValue
                             : SymbolFlags.ExportNamespace;
                     case SyntaxKind.ClassDeclaration:
@@ -6813,7 +6815,7 @@ module ts {
                         }
                     }
                 }
-                if (node.name.kind === SyntaxKind.StringLiteral) {
+                if (isTextualLiteralKind(node.name.kind)) {
                     if (!isGlobalSourceFile(node.parent)) {
                         error(node.name, Diagnostics.Ambient_external_modules_cannot_be_nested_in_other_modules);
                     }
@@ -6863,7 +6865,7 @@ module ts {
                 if (node.parent.kind === SyntaxKind.SourceFile) {
                     target = resolveImport(symbol);
                 }
-                else if (node.parent.kind === SyntaxKind.ModuleBlock && (<ModuleDeclaration>node.parent.parent).name.kind === SyntaxKind.StringLiteral) {
+                else if (node.parent.kind === SyntaxKind.ModuleBlock && isTextualLiteralKind((<ModuleDeclaration>node.parent.parent).name.kind)) {
                     // TypeScript 1.0 spec (April 2013): 12.1.6
                     // An ExternalImportDeclaration in an AmbientExternalModuleDeclaration may reference 
                     // other external modules only through top - level external module names.
@@ -7263,6 +7265,7 @@ module ts {
                 // Fall through
                 case SyntaxKind.NumericLiteral:
                 case SyntaxKind.StringLiteral:
+                case SyntaxKind.NoSubstitutionTemplateLiteral:
                     var parent = node.parent;
                     switch (parent.kind) {
                         case SyntaxKind.VariableDeclaration:
@@ -7314,6 +7317,7 @@ module ts {
                 case SyntaxKind.VoidKeyword:
                     return node.parent.kind !== SyntaxKind.PrefixOperator;
                 case SyntaxKind.StringLiteral:
+                case SyntaxKind.NoSubstitutionTemplateLiteral:
                     // Specialized signatures can have string literals as their parameters' type names
                     return node.parent.kind === SyntaxKind.Parameter;
 
@@ -7479,6 +7483,7 @@ module ts {
                     return undefined;
 
                 case SyntaxKind.StringLiteral:
+                case SyntaxKind.NoSubstitutionTemplateLiteral:
                     // External module name in an import declaration
                     if (node.parent.kind === SyntaxKind.ImportDeclaration && (<ImportDeclaration>node.parent).externalModuleName === node) {
                         var importSymbol = getSymbolOfNode(node.parent);

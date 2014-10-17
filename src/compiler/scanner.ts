@@ -24,6 +24,7 @@ module ts {
         isReservedWord(): boolean;
         reScanGreaterToken(): SyntaxKind;
         reScanSlashToken(): SyntaxKind;
+        scanTemplateToken(): SyntaxKind;
         scan(): SyntaxKind;
         setText(text: string): void;
         setTextPos(textPos: number): void;
@@ -465,7 +466,7 @@ module ts {
         var len: number;       // Length of text
         var startPos: number;  // Start position of whitespace before current token
         var tokenPos: number;  // Start position of text of current token
-        var token: number;
+        var token: SyntaxKind;
         var tokenValue: string;
         var precedingLineBreak: boolean;
 
@@ -576,33 +577,54 @@ module ts {
             return result;
         }
 
+        /**
+         * Sets the current 'token' and 'tokenValue' and returns a portion of a template expression.
+         */
+        function scanTemplateToken() {
+            tokenValue = scanTemplateStringAndSetCurrentToken();
+            return token
+        }
+
         function scanTemplateStringAndSetCurrentToken() {
-            var result = ""
-            var start = pos;
+            var isStartOfTemplate = text.charCodeAt(pos) === CharacterCodes.backtick;
+
+            // If we've tried scanning on anything other than a backtick or closing brace
+            // then report an error and try to continue scanning normally
+            if (!isStartOfTemplate && text.charCodeAt(pos) !== CharacterCodes.closeBrace) {
+                error(Diagnostics.Invalid_template_literal_expected);
+            }
+
             pos++;
+            var start = pos;
+            var result = ""
 
             while (true) {
                 if (pos >= len) {
                     result += text.substring(start, pos);
                     error(Diagnostics.Unexpected_end_of_text);
-                    token = SyntaxKind.NoSubstitutionTemplateLiteral;
+                    token = isStartOfTemplate ? SyntaxKind.NoSubstitutionTemplateLiteral : SyntaxKind.TemplateTailLiteral;
                     break;
                 }
 
                 var currChar = text.charCodeAt(pos);
+
+                // '`'
                 if (currChar === CharacterCodes.backtick) {
                     result += text.substring(start, pos);
                     pos++;
-                    token = SyntaxKind.NoSubstitutionTemplateLiteral;
-                    break;
-                }
-                if (currChar === CharacterCodes.$ &&
-                    pos < len - 1 && text.charCodeAt(pos + 1) === CharacterCodes.openBrace) {
-                    pos += 2;
-                    token = SyntaxKind.TemplateHeadLiteral;
+                    token = isStartOfTemplate ? SyntaxKind.NoSubstitutionTemplateLiteral : SyntaxKind.TemplateTailLiteral;
                     break;
                 }
 
+                // '${'
+                if (currChar === CharacterCodes.$ && pos + 1 < len && text.charCodeAt(pos + 1) === CharacterCodes.openBrace) {
+                    result += text.substring(start, pos);
+                    pos += 2;
+                    token = isStartOfTemplate ? SyntaxKind.TemplateHeadLiteral : SyntaxKind.TemplateMiddleLiteral;
+                    break;
+                }
+
+                // Escape character
                 if (currChar === CharacterCodes.backslash) {
                     result += text.substring(start, pos);
                     result += scanEscapeSequence();
@@ -614,6 +636,8 @@ module ts {
                 // <CR><LF> and <CR> LineTerminatorSequences are normalized to <LF> for Template Values
                 // An explicit EscapeSequence is needed to include a <CR> or <CR><LF> sequence.
                 if (currChar === CharacterCodes.carriageReturn) {
+                    result += text.substring(start, pos);
+
                     if (pos + 1 < len && text.charCodeAt(pos + 1) === CharacterCodes.lineFeed) {
                         pos++;
                     }
@@ -788,8 +812,7 @@ module ts {
                         tokenValue = scanString();
                         return token = SyntaxKind.StringLiteral;
                     case CharacterCodes.backtick:
-                        tokenValue = scanTemplateStringAndSetCurrentToken();
-                        return token;
+                        return scanTemplateToken();
                     case CharacterCodes.percent:
                         if (text.charCodeAt(pos + 1) === CharacterCodes.equals) {
                             return pos += 2, token = SyntaxKind.PercentEqualsToken;
@@ -1144,7 +1167,8 @@ module ts {
             scan: scan,
             setText: setText,
             setTextPos: setTextPos,
-            tryScan: tryScan
+            tryScan: tryScan,
+            scanTemplateToken: scanTemplateToken,
         };
     }
 }

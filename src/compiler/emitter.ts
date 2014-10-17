@@ -793,13 +793,20 @@ module ts {
             }
 
             function emitLiteral(node: LiteralExpression) {
-                var text = getSourceTextOfLocalNode(node);
-                if (node.kind === SyntaxKind.StringLiteral && compilerOptions.sourceMap) {
+                var text = node.kind === SyntaxKind.NoSubstitutionTemplateLiteral && compilerOptions.target < ScriptTarget.ES6 ?
+                            getNoSubstitutionTemplateAsStringLiteralText(node) :
+                            getSourceTextOfLocalNode(node);
+
+                if (isTextualLiteralKind(node.kind) && compilerOptions.sourceMap) {
                     writer.writeLiteral(text);
                 }
                 else {
                     write(text);
                 }
+            }
+
+            function getNoSubstitutionTemplateAsStringLiteralText(node: LiteralExpression): string {
+                return "\"" + escapeString(node.text) + "\"";
             }
 
             // This function specifically handles numeric/string literals for enum and accessor 'identifiers'.
@@ -2091,6 +2098,7 @@ module ts {
                     case SyntaxKind.NumericLiteral:
                     case SyntaxKind.StringLiteral:
                     case SyntaxKind.RegularExpressionLiteral:
+                    case SyntaxKind.NoSubstitutionTemplateLiteral:
                         return emitLiteral(<LiteralExpression>node);
                     case SyntaxKind.QualifiedName:
                         return emitPropertyAccess(<QualifiedName>node);

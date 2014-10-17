@@ -452,6 +452,14 @@ module ts {
         return s.parameters.length > 0 && (s.parameters[s.parameters.length - 1].flags & NodeFlags.Rest) !== 0;
     }
 
+    export function isLiteralKind(kind: SyntaxKind) {
+        return kind === SyntaxKind.StringLiteral || kind === SyntaxKind.NumericLiteral || kind === SyntaxKind.NoSubstitutionTemplateLiteral;
+    }
+
+    export function isTextualLiteralKind(kind: SyntaxKind) {
+        return kind === SyntaxKind.StringLiteral || kind === SyntaxKind.NoSubstitutionTemplateLiteral;
+    }
+
     export function isInAmbientContext(node: Node): boolean {
         while (node) {
             if (node.flags & (NodeFlags.Ambient | NodeFlags.DeclarationFile)) return true;
@@ -510,7 +518,7 @@ module ts {
 
     // True if the given identifier, string literal, or number literal is the name of a declaration node
     export function isDeclarationOrFunctionExpressionOrCatchVariableName(name: Node): boolean {
-        if (name.kind !== SyntaxKind.Identifier && name.kind !== SyntaxKind.StringLiteral && name.kind !== SyntaxKind.NumericLiteral) {
+        if (name.kind !== SyntaxKind.Identifier && isLiteralKind(name.kind)) {
             return false;
         }
 
@@ -1021,11 +1029,14 @@ module ts {
         }
 
         function isPropertyName(): boolean {
-            return token >= SyntaxKind.Identifier || token === SyntaxKind.StringLiteral || token === SyntaxKind.NumericLiteral;
+            return token >= SyntaxKind.Identifier ||
+                   token === SyntaxKind.StringLiteral ||
+                   token === SyntaxKind.NumericLiteral ||
+                   token === SyntaxKind.NoSubstitutionTemplateLiteral;
         }
 
         function parsePropertyName(): Identifier {
-            if (token === SyntaxKind.StringLiteral || token === SyntaxKind.NumericLiteral) {
+            if (isLiteralKind(token)) {
                 return parseLiteralNode(/*internName:*/ true);
             }
             return parseIdentifierName();
@@ -1296,7 +1307,22 @@ module ts {
             return finishNode(node);
         }
 
-        function parseLiteralNode(internName?:boolean): LiteralExpression {
+        function parseTemplateExpression() {
+            var template = <TemplateExpression>createNode(token);
+            var literalParts = [parseLiteralNode()];
+            var expressions = [parseExpression()];
+
+            while (scanner.scanTemplateToken() !== SyntaxKind.TemplateTailLiteral) {
+                literalParts.push(parseLiteralNode())
+                expressions.push(parseExpression());
+            }
+
+            template.literalParts = literalParts;
+            template.expressions = expressions;
+            return finishNode(template);
+        }
+
+        function parseLiteralNode(internName?: boolean): LiteralExpression {
             var node = <LiteralExpression>createNode(token);
             var text = scanner.getTokenValue();
             node.text = internName ? internIdentifier(text) : text;
@@ -1308,7 +1334,7 @@ module ts {
             // Octal literals are not allowed in strict mode or ES5
             // Note that theoretically the following condition would hold true literals like 009,
             // which is not octal.But because of how the scanner separates the tokens, we would
-            // never get a token like this.Instead, we would get 00 and 9 as two separate tokens.
+            // never get a token like this. Instead, we would get 00 and 9 as two separate tokens.
             // We also do not need to check for negatives because any prefix operator would be part of a
             // parent unary expression.
             if (node.kind === SyntaxKind.NumericLiteral
@@ -1327,7 +1353,9 @@ module ts {
         }
 
         function parseStringLiteral(): LiteralExpression {
-            if (token === SyntaxKind.StringLiteral) return parseLiteralNode(/*internName:*/ true);
+            if (isTextualLiteralKind(token)) {
+                return parseLiteralNode(/*internName:*/ true);
+            }
             error(Diagnostics.String_literal_expected);
             return <LiteralExpression>createMissingNode();
         }
@@ -1391,7 +1419,7 @@ module ts {
         }
 
         function parseParameterType(): TypeNode {
-            return parseOptional(SyntaxKind.ColonToken) ? token === SyntaxKind.StringLiteral ? parseStringLiteral() : parseType() : undefined;
+            return parseOptional(SyntaxKind.ColonToken) ? isTextualLiteralKind(token) ? parseStringLiteral() : parseType() : undefined;
         }
 
         function isParameter(): boolean {
@@ -1627,6 +1655,7 @@ module ts {
                     }
                 case SyntaxKind.StringLiteral:
                 case SyntaxKind.NumericLiteral:
+                case SyntaxKind.NoSubstitutionTemplateLiteral:
                     return parsePropertyOrMethod();
                 default:
                     if (token >= SyntaxKind.Identifier) {
@@ -1755,6 +1784,7 @@ module ts {
                 case SyntaxKind.FalseKeyword:
                 case SyntaxKind.NumericLiteral:
                 case SyntaxKind.StringLiteral:
+                case SyntaxKind.NoSubstitutionTemplateLiteral:
                 case SyntaxKind.OpenParenToken:
                 case SyntaxKind.OpenBracketToken:
                 case SyntaxKind.OpenBraceToken:
@@ -1879,6 +1909,7 @@ module ts {
                     case SyntaxKind.RegularExpressionLiteral:
                     case SyntaxKind.NumericLiteral:
                     case SyntaxKind.StringLiteral:
+                    case SyntaxKind.NoSubstitutionTemplateLiteral:
                     case SyntaxKind.FalseKeyword:
                     case SyntaxKind.NullKeyword:
                     case SyntaxKind.ThisKeyword:
@@ -2284,7 +2315,7 @@ module ts {
                     }
                     else {
                         indexedAccess.index = parseExpression();
-                        if (indexedAccess.index.kind === SyntaxKind.StringLiteral || indexedAccess.index.kind === SyntaxKind.NumericLiteral) {
+                        if (isLiteralKind(indexedAccess.index.kind)) {
                             var literal = <LiteralExpression>indexedAccess.index;
                             literal.text = internIdentifier(literal.text);
                         }
@@ -2343,6 +2374,7 @@ module ts {
                     return parseTokenNode();
                 case SyntaxKind.NumericLiteral:
                 case SyntaxKind.StringLiteral:
+                case SyntaxKind.NoSubstitutionTemplateLiteral:
                     return parseLiteralNode();
                 case SyntaxKind.OpenParenToken:
                     return parseParenExpression();
@@ -2360,6 +2392,9 @@ module ts {
                         return parseLiteralNode();
                     }
                     break;
+                case SyntaxKind.TemplateHeadLiteral:
+                    return parseTemplateExpression();
+                    
                 default:
                     if (isIdentifier()) {
                         return parseIdentifier();
@@ -3527,7 +3562,7 @@ module ts {
             if (token === SyntaxKind.ConstructorKeyword) {
                 return parseConstructorDeclaration(pos, flags);
             }
-            if (token >= SyntaxKind.Identifier || token === SyntaxKind.StringLiteral || token === SyntaxKind.NumericLiteral) {
+            if (token >= SyntaxKind.Identifier || isLiteralKind(token)) {
                 return parsePropertyMemberDeclaration(pos, flags);
             }
             if (token === SyntaxKind.OpenBracketToken) {
@@ -3718,7 +3753,7 @@ module ts {
 
         function parseModuleDeclaration(pos: number, flags: NodeFlags): ModuleDeclaration {
             parseExpected(SyntaxKind.ModuleKeyword);
-            return token === SyntaxKind.StringLiteral ? parseAmbientExternalModuleDeclaration(pos, flags) : parseInternalModuleTail(pos, flags);
+            return isTextualLiteralKind(token) ? parseAmbientExternalModuleDeclaration(pos, flags) : parseInternalModuleTail(pos, flags);
         }
 
         function parseImportDeclaration(pos: number, flags: NodeFlags): ImportDeclaration {
@@ -3761,7 +3796,7 @@ module ts {
                     return lookAhead(() => nextToken() >= SyntaxKind.Identifier);
                 case SyntaxKind.ModuleKeyword:
                     // Not a true keyword so ensure an identifier or string literal follows
-                    return lookAhead(() => nextToken() >= SyntaxKind.Identifier || token === SyntaxKind.StringLiteral);
+                    return lookAhead(() => nextToken() >= SyntaxKind.Identifier || isTextualLiteralKind(token));
                 case SyntaxKind.ExportKeyword:
                     // Check for export assignment or modifier on source element
                     return lookAhead(() => nextToken() === SyntaxKind.EqualsToken || isDeclaration());
@@ -4091,7 +4126,7 @@ module ts {
                         }
                     }
                 }
-                else if (node.kind === SyntaxKind.ModuleDeclaration && (<ModuleDeclaration>node).name.kind === SyntaxKind.StringLiteral && (node.flags & NodeFlags.Ambient || isDeclarationFile(file))) {
+                else if (node.kind === SyntaxKind.ModuleDeclaration && isTextualLiteralKind((<ModuleDeclaration>node).name.kind) && (node.flags & NodeFlags.Ambient || isDeclarationFile(file))) {
                     // TypeScript 1.0 spec (April 2014): 12.1.6
                     // An AmbientExternalModuleDeclaration declares an external module. 
                     // This type of declaration is permitted only in the global module.

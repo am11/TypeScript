@@ -174,6 +174,7 @@ module ts {
         PostfixOperator,
         BinaryExpression,
         ConditionalExpression,
+        TemplateExpression,
         OmittedExpression,
         // Element
         Block,
@@ -373,11 +374,17 @@ module ts {
         body: Node; // Required, whereas the member inherited from FunctionDeclaration is optional
     }
 
-    // The text property of a LiteralExpression stores the interpreted value of the literal in text form. For a StringLiteral
-    // this means quotes have been removed and escapes have been converted to actual characters. For a NumericLiteral, the
-    // stored value is the toString() representation of the number. For example 1, 1.00, and 1e0 are all stored as just "1".
+    // The text property of a LiteralExpression stores the interpreted value of the literal in text form. For a StringLiteral,
+    // or any literal of a template, this means quotes have been removed and escapes have been converted to actual characters.
+    // For a NumericLiteral, the stored value is the toString() representation of the number. For example 1, 1.00, and 1e0 are all stored as just "1".
     export interface LiteralExpression extends Expression {
         text: string;
+    }
+
+    // Note that a NoSubstitutionTemplateLiteral is a LiteralExpression, not a TemplateExpression.
+    export interface TemplateExpression extends Expression {
+        literalParts: LiteralExpression[];
+        expressions: Expression[];
     }
 
     export interface ParenExpression extends Expression {
