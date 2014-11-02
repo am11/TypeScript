@@ -1,0 +1,26 @@
+# appveyor file
+# http://www.appveyor.com/docs/appveyor-yml
+
+environment:
+  CODECLIMATE_REPO_TOKEN: 9852ac5362c8cc38c07ca5adc0f94c20c6c79bd78e17933dc284598a65338656
+  matrix:
+    # node.js
+    - nodejs_version: 0.10
+    - nodejs_version: 0    # will fetch the latest (stable) node.js version
+    # io.js
+    - nodejs_version: 1    # will fetch the latest (stable) io.js version
+
+install:
+  - ps: Install-Product node $env:nodejs_version
+  - node -v
+  - npm -v
+  - npm install
+  - npm install -g codeclimate-test-reporter
+
+test_script: 
+  - npm test 
+
+after_test:
+  - ps: cat coverage/lcov.info | codeclimate
+
+build: off
